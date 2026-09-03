@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>JEJU HEAT GUARD — 온열환경 위험 모니터링 및 대응 지원 시스템</title>
+<link rel="stylesheet" as="style" crossorigin
+  href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --bg-alt: #F7F8FA;
+    --text-primary: #111827;
+    --text-secondary: #4B5563;
+    --text-tertiary: #9CA3AF;
+    --border: #E5E7EB;
+    --content-max: 1400px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--text-primary);
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { display: flex; flex-direction: column; min-height: 100vh; }
+  .icon { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; vertical-align: -2px; }
+
+  /* header + tab nav — sticky as one group so it never scrolls out of view */
+  .app-header-group { position: sticky; top: 0; z-index: 50; background: var(--bg); }
+
+  header.site-header { border-bottom: 1px solid var(--border); background: var(--bg); }
+  .header-inner { max-width: var(--content-max); margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .logo-group { display: flex; align-items: baseline; gap: 10px; }
+  .logo { font-size: 16px; font-weight: 800; }
+  .logo-sub { font-size: 12px; color: var(--text-tertiary); display: none; }
+  @media (min-width: 640px) { .logo-sub { display: inline; } }
+  .status-group { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--text-secondary); }
+  .data-state { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-size: 11px; border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; color: var(--text-secondary); }
+  .data-state.live { color: #2E7D32; border-color: #2E7D32; }
+  .data-state .dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+
+  /* tab nav */
+  nav.tab-nav { border-bottom: 1px solid var(--border); background: var(--bg); overflow-x: auto; -ms-overflow-style: none; scrollbar-width: none; }
+  nav.tab-nav::-webkit-scrollbar { display: none; }
+  .tab-nav-inner { max-width: var(--content-max); margin: 0 auto; padding: 0 20px; display: flex; align-items: center; gap: 22px; white-space: nowrap; }
+  .tab-btn { background: none; border: none; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text-secondary); padding: 12px 2px 10px; border-bottom: 2px solid transparent; }
+  .tab-btn.active { color: var(--text-primary); border-bottom-color: var(--text-primary); }
+  .tab-btn.aux { font-weight: 500; color: var(--text-tertiary); }
+  .tab-btn.aux.active { color: var(--text-primary); border-bottom-color: var(--text-primary); }
+  .tab-divider { width: 1px; height: 16px; background: var(--border); flex: none; }
+
+  main { flex: 1; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .wrap { max-width: var(--content-max); margin: 0 auto; padding: 28px 24px 48px; }
+
+  .panel-title-row { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .panel-title-row h2 { font-size: 18px; font-weight: 700; margin: 0; }
+  .panel-title-row p { font-size: 13px; color: var(--text-secondary); margin: 6px 0 0; max-width: 640px; line-height: 1.6; }
+  .demo-tag { font-size: 11px; font-weight: 600; color: var(--text-tertiary); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; white-space: nowrap; display: inline-block; }
+  .source-line { font-size: 12px; color: var(--text-tertiary); margin-top: 10px; }
+  .risk-dot { display: inline-block; border-radius: 999px; }
+  .risk-label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; }
+  .sub-heading { font-size: 14px; font-weight: 700; margin: 28px 0 12px; }
+  .sub-heading:first-child { margin-top: 0; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; }
+  .table-wrap table { min-width: 560px; }
+  .table-wrap thead tr { background: var(--bg-alt); border-bottom: 1px solid var(--border); }
+  .table-wrap th { text-align: left; font-size: 12px; font-weight: 700; color: var(--text-secondary); padding: 10px 14px; }
+  .table-wrap tbody tr { border-bottom: 1px solid var(--border); }
+  .table-wrap tbody tr:last-child { border-bottom: none; }
+  .table-wrap td { padding: 12px 14px; font-size: 13px; }
+  .table-wrap td.strong { font-weight: 700; }
+  .table-wrap td.muted { color: var(--text-secondary); }
+
+  /* TAB 1 상황판 */
+  .status-panel { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; }
+  .status-time-row { display: flex; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--bg-alt); font-size: 12px; }
+  .status-main-row { display: flex; flex-wrap: wrap; }
+  .status-main-cell { flex: 1 1 260px; padding: 24px 20px; }
+  .status-main-cell.bordered { border-right: 1px solid var(--border); }
+  .status-main-cell .cap { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+  .wbgt-big { font-size: 32px; font-weight: 800; line-height: 1; }
+  .wbgt-unit { font-size: 15px; font-weight: 600; color: var(--text-secondary); margin-left: 4px; }
+  .hero-pair { display: flex; gap: 28px; flex-wrap: wrap; }
+  .hero-pair .hero-label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+  .status-sub-row { display: flex; flex-wrap: wrap; border-top: 1px solid var(--border); }
+  .status-sub-cell { flex: 1 1 25%; padding: 16px 20px; }
+  .status-sub-cell.bordered { border-right: 1px solid var(--border); }
+  .status-sub-cell .cap { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .status-sub-cell .val { font-size: 18px; font-weight: 700; }
+  @media (max-width: 640px) { .status-main-cell.bordered { border-right: none; border-bottom: 1px solid var(--border); } }
+
+  .status-note { font-size: 12px; color: var(--text-tertiary); margin: 10px 0 24px; line-height: 1.6; }
+
+  /* TAB 2 위험지도 */
+  .map-layout { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--bg); }
+  .map-area { flex: 2 1 500px; min-height: 480px; position: relative; background: #F1F3F5; display: flex; align-items: center; justify-content: center; }
+  .map-placeholder-text { text-align: center; color: var(--text-tertiary); font-size: 13px; padding: 24px; }
+  .map-legend { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column; gap: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; }
+  .map-legend .row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); }
+  .map-legend .dot { width: 7px; height: 7px; }
+  .station-selectors { position: absolute; bottom: 14px; left: 14px; right: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .station-btn { cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text-primary); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-family: inherit; }
+  .station-btn.active { font-weight: 700; border-color: var(--text-primary); }
+  .station-btn .dot { width: 7px; height: 7px; }
+  .map-detail-panel { flex: 1 1 320px; border-left: 1px solid var(--border); padding: 20px; }
+  .map-detail-panel .place { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 14px; font-weight: 700; }
+  .map-detail-panel .risk-row { margin-bottom: 14px; }
+  .why-box { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px; }
+  .detail-table tr { border-top: 1px solid var(--border); }
+  .detail-table tr:first-child { border-top: none; }
+  .detail-table td { padding: 9px 0; font-size: 13px; }
+  .detail-table td.label { color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+  .detail-table td.value { font-weight: 700; text-align: right; }
+  .detail-table td.value.big { font-size: 17px; }
+  @media (max-width: 860px) { .map-layout { flex-direction: column; } .map-area { min-height: 320px; } .map-detail-panel { border-left: none; border-top: 1px solid var(--border); } }
+
+  /* TAB 3 대응현황 */
+  .risk-count-row { display: flex; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 28px; }
+  .risk-count-cell { flex: 1 1 33%; padding: 16px 20px; border-right: 1px solid var(--border); }
+  .risk-count-cell:last-child { border-right: none; }
+  .risk-count-cell .cap { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .risk-count-cell .val { font-size: 22px; font-weight: 800; }
+  @media (max-width: 640px) { .risk-count-row { flex-direction: column; } .risk-count-cell { border-right: none; border-bottom: 1px solid var(--border); } .risk-count-cell:last-child { border-bottom: none; } }
+
+  .priority-list { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 28px; }
+  .priority-list .row { display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-top: 1px solid var(--border); font-size: 13px; }
+  .priority-list .row:first-child { border-top: none; }
+  .priority-list .rank { font-size: 12px; color: var(--text-tertiary); width: 18px; }
+  .priority-list .name { font-weight: 700; width: 90px; }
+  .priority-list .wbgt { color: var(--text-secondary); width: 190px; }
+
+  .location-prompt { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; background: var(--bg-alt); }
+  .location-prompt .msg { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+  .btn-primary { background: var(--text-primary); color: #fff; border: none; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .shelter-layout { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--bg); margin-bottom: 32px; }
+  .shelter-map { flex: 1.3 1 340px; min-height: 300px; background: #F1F3F5; display: flex; align-items: center; justify-content: center; color: var(--text-tertiary); font-size: 13px; padding: 24px; text-align: center; }
+  .shelter-list { flex: 1 1 300px; border-left: 1px solid var(--border); }
+  .shelter-list .item { padding: 14px 18px; border-top: 1px solid var(--border); }
+  .shelter-list .item:first-child { border-top: none; }
+  .shelter-list .name { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+  .shelter-list .addr { font-size: 12px; color: var(--text-secondary); margin-bottom: 2px; }
+  .shelter-list .meta { font-size: 12px; color: var(--text-secondary); display: flex; justify-content: space-between; }
+  .shelter-list .dist { font-weight: 700; color: var(--text-primary); }
+  @media (max-width: 720px) { .shelter-layout { flex-direction: column; } .shelter-map { min-height: 200px; } .shelter-list { border-left: none; border-top: 1px solid var(--border); } }
+
+  .patient-box { border: 1px solid var(--border); border-radius: 6px; padding: 16px 18px; margin-bottom: 16px; background: var(--bg-alt); }
+  .patient-box .step-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
+  .patient-select-btn { width: 100%; border: 1px dashed var(--border); border-radius: 4px; background: var(--bg); padding: 18px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; color: var(--text-tertiary); font-size: 13px; font-weight: 600; font-family: inherit; }
+  .patient-select-btn.selected { color: var(--text-primary); }
+  #hospital-result { display: none; }
+  #hospital-result.show { display: block; }
+
+  /* TAB 4 분석·연구 */
+  .research-block { margin-bottom: 28px; }
+  .research-block h3 { font-size: 14px; font-weight: 700; margin: 0 0 10px; }
+  .research-block p { font-size: 13px; color: var(--text-secondary); line-height: 1.8; margin: 0 0 10px; }
+  .formula-code { font-family: monospace; font-size: 13px; font-weight: 700; color: var(--text-primary); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 4px; padding: 12px 14px; margin: 10px 0; white-space: pre-line; line-height: 1.7; }
+  .source-list { border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+  .source-list .row { display: flex; align-items: center; gap: 14px; padding: 11px 18px; border-top: 1px solid var(--border); font-size: 13px; }
+  .source-list .row:first-child { border-top: none; }
+
+  .ts-layout { display: flex; border: 1px solid var(--border); border-radius: 6px; }
+  .ts-chart { flex: 1 1 480px; max-width: 720px; padding: 20px 20px 8px; min-width: 0; }
+  .ts-chart svg { display: block; width: 100%; height: auto; aspect-ratio: 560 / 240; }
+  .ts-summary { flex: 1 1 220px; border-left: 1px solid var(--border); min-width: 0; }
+  .ts-summary .row { padding: 16px 18px; border-top: 1px solid var(--border); }
+  .ts-summary .row:first-child { border-top: none; }
+  .ts-summary .cap { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .ts-summary .val { font-size: 16px; font-weight: 700; }
+  @media (max-width: 720px) { .ts-layout { flex-direction: column; } .ts-summary { border-left: none; border-top: 1px solid var(--border); display: flex; } .ts-summary .row { flex: 1; border-top: none; border-right: 1px solid var(--border); } .ts-summary .row:last-child { border-right: none; } }
+
+  footer { border-top: 1px solid var(--border); padding: 20px 20px; }
+  footer .wrap { padding: 0; max-width: var(--content-max); }
+  footer .foot-desc { font-size: 12px; color: var(--text-tertiary); line-height: 1.7; }
+
+  /* mobile: tighter side padding, full width */
+  @media (max-width: 640px) {
+    .wrap { padding-left: 16px; padding-right: 16px; }
+    .header-inner, .tab-nav-inner { padding-left: 16px; padding-right: 16px; }
+  }
+
+  /* wide-screen: use the extra room instead of leaving it as side margin */
+  @media (min-width: 1440px) {
+    .wrap { padding-left: 32px; padding-right: 32px; }
+    .header-inner, .tab-nav-inner { padding-left: 32px; padding-right: 32px; }
+    .wbgt-big { font-size: 42px; }
+    .panel-title-row h2 { font-size: 21px; }
+    .status-sub-cell .val, .risk-count-cell .val { font-size: 21px; }
+    .table-wrap th, .table-wrap td { padding: 13px 18px; font-size: 14px; }
+    .map-area { min-height: 560px; }
+    .shelter-map { min-height: 380px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-header-group">
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo-group">
+        <span class="logo">JEJU HEAT GUARD</span>
+        <span class="logo-sub">온열환경 위험 모니터링 및 대응 지원 시스템</span>
+      </div>
+      <div class="status-group">
+        <span class="data-state" id="data-state-badge"><span class="dot"></span> DEMO DATA</span>
+        <span id="header-timestamp">기준시각 2026.08.30 15:40</span>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tab-nav">
+    <div class="tab-nav-inner" id="tab-nav-inner"></div>
+  </nav>
+</div>
+
+<main>
+  <div class="wrap">
+
+    <!-- TAB 1: 상황판 -->
+    <section class="tab-panel active" id="tab-dashboard">
+      <div class="panel-title-row">
+        <div>
+          <h2>제주 온열환경 실시간 상황판</h2>
+          <p>현재 제주가 얼마나 위험한지 빠르게 파악할 수 있도록 핵심 정보를 우선순위대로 표시합니다.</p>
+        </div>
+        <span class="demo-tag">Demo Data</span>
+      </div>
+
+      <div class="status-panel">
+        <div class="status-time-row">
+          <span style="color:var(--text-secondary)">기준시각 · 데이터 출처</span>
+          <span style="font-weight:600">2026.08.30 13:40 · 기상청 AWS 관측자료 (Demo)</span>
+        </div>
+        <div class="status-main-row">
+          <div class="status-main-cell bordered">
+            <div class="cap">현재 가장 위험한 지역 · <span id="dashboard-hero-region"></span></div>
+            <div class="hero-pair">
+              <div>
+                <span class="wbgt-big" id="hero-wbgt"></span><span class="wbgt-unit">°C</span>
+                <div class="hero-label">WBGT (체감 열지수)</div>
+              </div>
+              <div>
+                <span class="wbgt-big" id="hero-temp"></span><span class="wbgt-unit">°C</span>
+                <div class="hero-label">현재기온</div>
+              </div>
+            </div>
+          </div>
+          <div class="status-main-cell">
+            <div class="cap">현재 위험단계</div>
+            <div id="dashboard-risk" style="margin-top:6px;"></div>
+          </div>
+        </div>
+        <div class="status-sub-row">
+          <div class="status-sub-cell bordered"><div class="cap">위험지역</div><div class="val" id="dashboard-risk-area-count">-</div></div>
+          <div class="status-sub-cell bordered"><div class="cap">평균습도</div><div class="val">68%</div></div>
+          <div class="status-sub-cell"><div class="cap">직전 대비 추세</div><div class="val" id="dashboard-trend">-</div></div>
+        </div>
+      </div>
+      <div class="status-note">위 수치는 개발 단계 예시 데이터입니다. 실제 서비스에서는 기상청 AWS 관측자료가 연결되는 즉시 자동 갱신됩니다.</div>
+
+      <h3 class="sub-heading">지역별 현재 위험상황 — 어디를 우선 확인해야 하는가</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>지역</th><th>WBGT</th><th>기온</th><th>위험단계</th><th>상태</th></tr></thead>
+          <tbody id="dashboard-region-body"></tbody>
+        </table>
+      </div>
+      <div class="source-line">위험도가 높은 지역이 상단에 오도록 정렬되어 있습니다 · 2026.08.30 13:40 기준</div>
+    </section>
+
+    <!-- TAB 2: 위험지도 -->
+    <section class="tab-panel" id="tab-map">
+      <div class="panel-title-row">
+        <div>
+          <h2>위험 지도</h2>
+          <p>위험의 공간적 분포를 확인하는 화면입니다. 실제 데이터가 없는 지역의 위험도는 임의로 생성하지 않으며, 확보된 관측 단위(관측소) 기준으로 표시합니다.</p>
+        </div>
+        <span class="demo-tag">Map Placeholder · Phase 2 예정</span>
+      </div>
+
+      <div class="map-layout">
+        <div class="map-area">
+          <div class="map-placeholder-text">
+            실제 제주 지도 시각화는 Phase 2에서 구현됩니다.<br />
+            아래 관측지점을 선택해 상세 정보를 확인하세요.
+          </div>
+          <div class="map-legend" id="map-legend"></div>
+          <div class="station-selectors" id="station-selectors"></div>
+        </div>
+        <div class="map-detail-panel">
+          <div class="place">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span id="detail-place-name"></span>
+          </div>
+          <div class="risk-row" id="detail-risk"></div>
+          <div class="why-box" id="detail-why"></div>
+          <table class="detail-table" id="detail-table"></table>
+          <div class="source-line">기상청 AWS 관측자료 (Demo) · 2026.08.30 13:40 기준</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: 대응현황 -->
+    <section class="tab-panel" id="tab-response">
+      <div class="panel-title-row">
+        <div>
+          <h2>대응현황</h2>
+          <p>현재 위험상황에 따라 어떤 대응이 필요한지 확인하는 화면입니다. 위험지역을 먼저 확인한 뒤, 무더위쉼터와 응급 이송 정보를 이어서 확인할 수 있습니다.</p>
+        </div>
+        <span class="demo-tag">Demo Data</span>
+      </div>
+
+      <div class="risk-count-row">
+        <div class="risk-count-cell"><div class="cap">주의 이상 지역</div><div class="val" id="count-caution-up">-</div></div>
+        <div class="risk-count-cell"><div class="cap">엄중경계 이상</div><div class="val" id="count-severe-up">-</div></div>
+        <div class="risk-count-cell"><div class="cap">위험</div><div class="val" id="count-danger">-</div></div>
+      </div>
+
+      <h3 class="sub-heading">위험지역 우선순위</h3>
+      <div class="priority-list" id="priority-list"></div>
+
+      <h3 class="sub-heading">무더위쉼터</h3>
+      <div class="location-prompt" id="location-prompt">
+        <div class="msg">
+          <svg class="icon" viewBox="0 0 24 24"><path d="m3 11 19-9-9 19-2-8-8-2Z"/></svg>
+          현재 위치를 사용하면 가까운 순으로 정렬해 보여드립니다. 위치를 허용하지 않아도 아래 지도에서 제주 전체 쉼터를 확인할 수 있습니다.
+        </div>
+        <button class="btn-primary" id="use-location-btn">현재 위치 사용</button>
+      </div>
+      <div class="shelter-layout">
+        <div class="shelter-map">제주 전체 지도 — 모든 무더위쉼터 위치 표시 (Phase 2 이후 연동)</div>
+        <div class="shelter-list" id="shelter-list"></div>
+      </div>
+      <div class="source-line" style="margin-top:-20px;margin-bottom:24px;">무더위쉼터 공공데이터 (Demo — 실제 데이터 연결 필요) · 2026.08.30 13:40 기준</div>
+
+      <h3 class="sub-heading">응급 대응</h3>
+      <div class="patient-box">
+        <div class="step-label">환자 발생 위치를 지도에서 선택하세요.</div>
+        <button class="patient-select-btn" id="patient-select-btn">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span id="patient-select-text">지도에서 위치 선택 (Placeholder)</span>
+        </button>
+      </div>
+      <div id="hospital-result">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>의료기관</th><th>거리</th><th>예상 이동시간</th><th>비고</th></tr></thead>
+            <tbody id="hospital-table-body"></tbody>
+          </table>
+        </div>
+        <div class="source-line">거리 기반 예상값 (Demo — 실시간 교통 API 미연결) · 2026.08.30 13:40 기준</div>
+      </div>
+    </section>
+
+    <!-- TAB 4 (보조): 상세 데이터 -->
+    <section class="tab-panel" id="tab-analysis">
+      <div class="panel-title-row">
+        <div>
+          <h2>상세 데이터</h2>
+          <p>지역별·시간별 상세 수치와 WBGT 산출 근거, 데이터 출처를 확인할 수 있는 보조 정보입니다.</p>
+        </div>
+      </div>
+
+      <h3 class="sub-heading" style="margin-top:0">지역별 상세 비교</h3>
+      <div class="table-wrap" style="margin-bottom:32px;">
+        <table>
+          <thead><tr><th>지역</th><th>관측소</th><th>WBGT</th><th>기온</th><th>습도</th><th>풍속</th><th>위험단계</th></tr></thead>
+          <tbody id="regional-table-body"></tbody>
+        </table>
+      </div>
+
+      <h3 class="sub-heading">시간별 변화</h3>
+      <div class="ts-layout" style="margin-bottom:32px;">
+        <div class="ts-chart">
+          <svg id="ts-svg" viewBox="0 0 560 240" width="100%" preserveAspectRatio="xMidYMid meet"></svg>
+          <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px;">그래프의 점에 마우스를 올리거나 탭하면 해당 시각의 값을 확인할 수 있습니다.</div>
+        </div>
+        <div class="ts-summary" id="ts-summary"></div>
+      </div>
+
+      <div class="research-block">
+        <h3>WBGT란 무엇인가</h3>
+        <p>WBGT(습구흑구온도, Wet-Bulb Globe Temperature)는 기온·습도·바람·복사열을 종합적으로 반영해 인체가 느끼는 열환경 부담을 나타내는 지표입니다. 단순 기온만으로는 설명하기 어려운 온열질환 위험을 지역·시간에 따라 더 정확히 반영합니다.</p>
+      </div>
+
+      <div class="research-block">
+        <h3>WBGT 계산 방법</h3>
+        <p>본 프로젝트는 선행연구에서 검토한 KMA2006 기반 추정방법을 기본 모델로 사용하며, 계산식은 임의로 변경하지 않습니다.</p>
+        <div class="formula-code">실외(햇빛이 있는 경우)
+WBGT = 0.7 × 자연습구온도 + 0.2 × 흑구온도 + 0.1 × 건구온도
+
+실내 또는 그늘
+WBGT = 0.7 × 자연습구온도 + 0.3 × 흑구온도</div>
+        <p style="font-size:12px;color:var(--text-tertiary);">※ 실제 적용 공식과 변수는 연구팀이 확정한 기준을 따릅니다. 위험단계 구간값도 연구 기준 확정 전까지는 임시 Configuration 값입니다.</p>
+      </div>
+
+      <div class="research-block">
+        <h3>데이터 출처</h3>
+        <div class="source-list">
+          <div class="row">기상청 실시간 관측자료 — 현재 온열환경 위험도 모니터링에 사용</div>
+          <div class="row">제주 지역 과거 기후자료 (2015–2024) — 지역 기후 특성 분석 전용, 실시간 계산에는 사용하지 않음</div>
+          <div class="row">무더위쉼터 공공데이터</div>
+          <div class="row">의료기관 관련 공공데이터</div>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-desc">
+      JEJU HEAT GUARD · 본 화면의 기상·쉼터·의료기관·이송시간 정보는 개발 단계의 Demo Data이며 실제 관측·공공 데이터와 다를 수 있습니다.
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   DATA — 기존 구조·값 그대로 유지 (Demo Data)
+   ============================================================ */
+var RISK_LEVELS = [
+  { key: "safe", label: "거의 안전", color: "#2E7D32", max: 28 },
+  { key: "caution", label: "주의", color: "#F9A825", max: 31 },
+  { key: "warning", label: "경계", color: "#EF6C00", max: 33 },
+  { key: "severe", label: "엄중 경계", color: "#D32F2F", max: 35 },
+  { key: "danger", label: "위험", color: "#8E0000", max: Infinity }
+];
+
+var STATUS_LABEL = {
+  safe: "관찰",
+  caution: "관찰",
+  warning: "모니터링",
+  severe: "주의 필요",
+  danger: "즉시 대응 필요"
+};
+
+function classifyRisk(wbgt) {
+  for (var i = 0; i < RISK_LEVELS.length; i++) {
+    if (wbgt < RISK_LEVELS[i].max) return RISK_LEVELS[i];
+  }
+  return RISK_LEVELS[RISK_LEVELS.length - 1];
+}
+
+var MOCK_TIMESTAMP = "2026.08.30 13:40";
+
+var MOCK_REGIONS = [
+  { id: "north", name: "제주시", station: "제주", wbgt: 29.4, temperature: 33.1, humidity: 62, windSpeed: 2.1, solarRadiation: 780 },
+  { id: "south", name: "서귀포", station: "서귀포", wbgt: 28.7, temperature: 31.8, humidity: 68, windSpeed: 1.8, solarRadiation: 705 },
+  { id: "east", name: "성산", station: "성산", wbgt: 27.9, temperature: 31.2, humidity: 65, windSpeed: 3.4, solarRadiation: 812 },
+  { id: "west", name: "고산", station: "고산", wbgt: 26.3, temperature: 30.4, humidity: 70, windSpeed: 4.2, solarRadiation: 690 }
+];
+
+var MOCK_TIME_SERIES = [
+  { time: "09:00", wbgt: 24.1 },
+  { time: "10:00", wbgt: 25.8 },
+  { time: "11:00", wbgt: 27.3 },
+  { time: "12:00", wbgt: 28.6 },
+  { time: "13:00", wbgt: 29.4 },
+  { time: "14:00", wbgt: 29.9 },
+  { time: "15:00", wbgt: 29.1 },
+  { time: "16:00", wbgt: 27.8 },
+  { time: "17:00", wbgt: 26.0 }
+];
+
+var MOCK_SHELTERS = [
+  { id: 1, name: "OO주민센터 무더위쉼터", address: "제주시 OO동", distance: "0.4km", hours: "09:00–18:00" },
+  { id: 2, name: "OO경로당", address: "제주시 OO동", distance: "0.9km", hours: "09:00–18:00" },
+  { id: 3, name: "OO복지관", address: "제주시 OO동", distance: "1.3km", hours: "09:00–20:00" }
+];
+
+var MOCK_HOSPITALS = [
+  { id: 1, name: "OO병원 응급실", etaMin: 6, distance: "2.1km" },
+  { id: 2, name: "OO의료원", etaMin: 9, distance: "3.6km" },
+  { id: 3, name: "OO종합병원", etaMin: 12, distance: "5.0km" }
+];
+
+var TABS = [
+  { id: "tab-dashboard", label: "상황판", core: true },
+  { id: "tab-map", label: "위험지도", core: true },
+  { id: "tab-response", label: "대응현황", core: true },
+  { id: "tab-analysis", label: "상세 데이터", core: false }
+];
+
+/* ============================================================
+   ICONS
+   ============================================================ */
+var ICONS = {
+  thermometer: '<path d="M14 4v10.5a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>',
+  droplets: '<path d="M12 2s6 7 6 11a6 6 0 1 1-12 0c0-4 6-11 6-11Z"/>',
+  wind: '<path d="M2 8h11a2.5 2.5 0 1 0-2-4"/><path d="M2 13h15a2.5 2.5 0 1 1-2 4"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'
+};
+function iconSvg(name) {
+  return '<svg class="icon" viewBox="0 0 24 24">' + ICONS[name] + '</svg>';
+}
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function riskLabelHtml(level, dotSize) {
+  dotSize = dotSize || 9;
+  return '<span class="risk-label" style="color:' + level.color + '">' +
+    '<span class="risk-dot" style="width:' + dotSize + 'px;height:' + dotSize + 'px;background:' + level.color + '"></span>' +
+    level.label + '</span>';
+}
+
+function sortedByWbgtDesc(regions) {
+  return regions.slice().sort(function (a, b) { return b.wbgt - a.wbgt; });
+}
+
+/* ---------- tab navigation ---------- */
+function renderTabNav() {
+  var nav = document.getElementById('tab-nav-inner');
+  var html = '';
+  for (var i = 0; i < TABS.length; i++) {
+    var t = TABS[i];
+    if (!t.core && i > 0 && TABS[i - 1].core) {
+      html += '<span class="tab-divider"></span>';
+    }
+    html += '<button class="tab-btn' + (t.core ? '' : ' aux') + (i === 0 ? ' active' : '') +
+      '" data-tab="' + t.id + '">' + t.label + '</button>';
+  }
+  nav.innerHTML = html;
+
+  var btns = nav.querySelectorAll('.tab-btn');
+  for (var j = 0; j < btns.length; j++) {
+    btns[j].addEventListener('click', function (e) {
+      switchTab(e.currentTarget.getAttribute('data-tab'));
+    });
+  }
+}
+
+function switchTab(tabId) {
+  var panels = document.querySelectorAll('.tab-panel');
+  for (var i = 0; i < panels.length; i++) panels[i].classList.remove('active');
+  var target = document.getElementById(tabId);
+  if (target) target.classList.add('active');
+
+  var btns = document.querySelectorAll('.tab-btn');
+  for (var j = 0; j < btns.length; j++) {
+    btns[j].classList.toggle('active', btns[j].getAttribute('data-tab') === tabId);
+  }
+  window.scrollTo(0, 0);
+}
+
+/* ---------- TAB 1: 상황판 ---------- */
+function renderDashboard() {
+  var sorted = sortedByWbgtDesc(MOCK_REGIONS);
+  var topRegion = sorted[0];
+  var overallLevel = classifyRisk(topRegion.wbgt);
+
+  document.getElementById('dashboard-hero-region').textContent = topRegion.name;
+  document.getElementById('hero-wbgt').textContent = topRegion.wbgt;
+  document.getElementById('hero-temp').textContent = topRegion.temperature;
+  document.getElementById('dashboard-risk').innerHTML = riskLabelHtml(overallLevel, 12);
+
+  var riskAreaCount = 0;
+  for (var i = 0; i < MOCK_REGIONS.length; i++) {
+    if (classifyRisk(MOCK_REGIONS[i].wbgt).key !== 'safe') riskAreaCount++;
+  }
+  document.getElementById('dashboard-risk-area-count').textContent = riskAreaCount + '곳';
+
+  var values = MOCK_TIME_SERIES.map(function (d) { return d.wbgt; });
+  var trend = values[values.length - 1] - values[values.length - 2];
+  var trendEl = document.getElementById('dashboard-trend');
+  trendEl.textContent = (trend >= 0 ? '+' : '') + trend.toFixed(1) + '°C';
+  trendEl.style.color = trend >= 0 ? '#D32F2F' : '#2E7D32';
+
+  var body = document.getElementById('dashboard-region-body');
+  var rows = '';
+  for (var k = 0; k < sorted.length; k++) {
+    var r = sorted[k];
+    var level = classifyRisk(r.wbgt);
+    rows += '<tr><td class="strong">' + r.name + '</td>' +
+      '<td class="strong">' + r.wbgt + '°C</td>' +
+      '<td class="muted">' + r.temperature + '°C</td>' +
+      '<td>' + riskLabelHtml(level, 8) + '</td>' +
+      '<td class="muted">' + STATUS_LABEL[level.key] + '</td></tr>';
+  }
+  body.innerHTML = rows;
+}
+
+/* ---------- TAB 2: 위험지도 ---------- */
+var selectedRegionId = MOCK_REGIONS[0].id;
+
+function renderMap() {
+  var legend = document.getElementById('map-legend');
+  var legendHtml = '';
+  for (var i = 0; i < RISK_LEVELS.length; i++) {
+    var r = RISK_LEVELS[i];
+    legendHtml += '<div class="row"><span class="dot" style="border-radius:999px;background:' + r.color + '"></span>' + r.label + '</div>';
+  }
+  legend.innerHTML = legendHtml;
+
+  var selectors = document.getElementById('station-selectors');
+  var selHtml = '';
+  for (var j = 0; j < MOCK_REGIONS.length; j++) {
+    var reg = MOCK_REGIONS[j];
+    var rLevel = classifyRisk(reg.wbgt);
+    var active = reg.id === selectedRegionId;
+    selHtml += '<button class="station-btn' + (active ? ' active' : '') + '" data-id="' + reg.id + '">' +
+      '<span class="dot" style="border-radius:999px;background:' + rLevel.color + '"></span>' +
+      reg.name + ' WBGT ' + reg.wbgt + '° · 기온 ' + reg.temperature + '°</button>';
+  }
+  selectors.innerHTML = selHtml;
+
+  var btns = selectors.querySelectorAll('.station-btn');
+  for (var m = 0; m < btns.length; m++) {
+    btns[m].addEventListener('click', function (e) {
+      selectedRegionId = e.currentTarget.getAttribute('data-id');
+      renderMap();
+      renderDetailPanel();
+    });
+  }
+}
+
+function renderDetailPanel() {
+  var region = null;
+  for (var i = 0; i < MOCK_REGIONS.length; i++) {
+    if (MOCK_REGIONS[i].id === selectedRegionId) { region = MOCK_REGIONS[i]; break; }
+  }
+  var level = classifyRisk(region.wbgt);
+
+  document.getElementById('detail-place-name').textContent = region.name + ' (' + region.station + ')';
+  document.getElementById('detail-risk').innerHTML = riskLabelHtml(level, 9);
+  document.getElementById('detail-why').textContent =
+    '기온 ' + region.temperature + '°C, 습도 ' + region.humidity + '%, 풍속 ' + region.windSpeed +
+    ' m/s, 일사량 ' + region.solarRadiation + ' W/m²가 종합적으로 반영되어 WBGT ' + region.wbgt + '°C로 산출되었습니다.';
+
+  var rows = [
+    { icon: 'thermometer', label: 'WBGT', value: region.wbgt + '°C', big: true },
+    { icon: 'thermometer', label: '기온', value: region.temperature + '°C' },
+    { icon: 'droplets', label: '상대습도', value: region.humidity + '%' },
+    { icon: 'wind', label: '풍속', value: region.windSpeed + ' m/s' },
+    { icon: 'sun', label: '일사량', value: region.solarRadiation + ' W/m²' }
+  ];
+  var html = '';
+  for (var j = 0; j < rows.length; j++) {
+    var row = rows[j];
+    html += '<tr><td class="label">' + iconSvg(row.icon) + ' ' + row.label + '</td>' +
+      '<td class="value' + (row.big ? ' big' : '') + '">' + row.value + '</td></tr>';
+  }
+  document.getElementById('detail-table').innerHTML = html;
+}
+
+/* ---------- TAB 3: 대응현황 ---------- */
+function renderResponseCounts() {
+  var cautionUp = 0, severeUp = 0, danger = 0;
+  for (var i = 0; i < MOCK_REGIONS.length; i++) {
+    var key = classifyRisk(MOCK_REGIONS[i].wbgt).key;
+    if (key !== 'safe') cautionUp++;
+    if (key === 'severe' || key === 'danger') severeUp++;
+    if (key === 'danger') danger++;
+  }
+  document.getElementById('count-caution-up').textContent = cautionUp + '곳';
+  document.getElementById('count-severe-up').textContent = severeUp + '곳';
+  document.getElementById('count-danger').textContent = danger + '곳';
+}
+
+function renderPriorityList() {
+  var sorted = sortedByWbgtDesc(MOCK_REGIONS);
+  var list = document.getElementById('priority-list');
+  var html = '';
+  for (var i = 0; i < sorted.length; i++) {
+    var r = sorted[i];
+    var level = classifyRisk(r.wbgt);
+    html += '<div class="row">' +
+      '<span class="rank">' + (i + 1) + '</span>' +
+      '<span class="name">' + r.name + '</span>' +
+      '<span class="wbgt">WBGT ' + r.wbgt + '°C · 기온 ' + r.temperature + '°C</span>' +
+      riskLabelHtml(level, 8) +
+      '</div>';
+  }
+  list.innerHTML = html;
+}
+
+var locationAllowed = false;
+function renderShelters() {
+  var list = document.getElementById('shelter-list');
+  var html = '';
+  for (var i = 0; i < MOCK_SHELTERS.length; i++) {
+    var s = MOCK_SHELTERS[i];
+    html += '<div class="item">' +
+      '<div class="name">' + s.name + '</div>' +
+      '<div class="addr">' + s.address + '</div>' +
+      '<div class="meta"><span>운영 ' + s.hours + '</span>' +
+      (locationAllowed ? '<span class="dist">' + s.distance + '</span>' : '') +
+      '</div></div>';
+  }
+  list.innerHTML = html;
+}
+
+function setupLocationPrompt() {
+  document.getElementById('use-location-btn').addEventListener('click', function () {
+    locationAllowed = true;
+    document.getElementById('location-prompt').style.display = 'none';
+    renderShelters();
+  });
+}
+
+function setupEmergencyTransport() {
+  var btn = document.getElementById('patient-select-btn');
+  btn.addEventListener('click', function () {
+    btn.classList.add('selected');
+    document.getElementById('patient-select-text').textContent = '환자 발생 위치 선택됨 (Demo 좌표)';
+    document.getElementById('hospital-result').classList.add('show');
+    renderHospitalTable();
+  });
+}
+
+function renderHospitalTable() {
+  var sorted = MOCK_HOSPITALS.slice().sort(function (a, b) { return a.etaMin - b.etaMin; });
+  var tbody = document.getElementById('hospital-table-body');
+  var html = '';
+  for (var i = 0; i < sorted.length; i++) {
+    var h = sorted[i];
+    html += '<tr><td class="strong">' + h.name + '</td>' +
+      '<td class="muted">' + h.distance + '</td>' +
+      '<td class="strong">' + h.etaMin + '분</td>' +
+      '<td class="muted" style="font-size:12px">' + (i === 0 ? '예상 이동시간이 가장 짧은 후보' : '') + '</td></tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+/* ---------- TAB 4: 분석·연구 ---------- */
+function renderRegionalTable() {
+  var tbody = document.getElementById('regional-table-body');
+  var html = '';
+  for (var i = 0; i < MOCK_REGIONS.length; i++) {
+    var r = MOCK_REGIONS[i];
+    var level = classifyRisk(r.wbgt);
+    html += '<tr>' +
+      '<td class="strong">' + r.name + '</td>' +
+      '<td class="muted">' + r.station + '</td>' +
+      '<td class="strong">' + r.wbgt + '°C</td>' +
+      '<td class="muted">' + r.temperature + '°C</td>' +
+      '<td class="muted">' + r.humidity + '%</td>' +
+      '<td class="muted">' + r.windSpeed + ' m/s</td>' +
+      '<td>' + riskLabelHtml(level, 8) + '</td>' +
+      '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+function renderTimeSeries() {
+  var values = MOCK_TIME_SERIES.map(function (d) { return d.wbgt; });
+  var latest = values[values.length - 1];
+  var max = Math.max.apply(null, values);
+  var min = Math.min.apply(null, values);
+  var trend = latest - values[values.length - 2];
+  var level = classifyRisk(latest);
+
+  var rows = [
+    { label: '현재값', value: latest + '°C', color: null },
+    { label: '최고값 / 최저값', value: max + '°C / ' + min + '°C', color: null },
+    { label: '직전 대비 추세', value: (trend >= 0 ? '+' : '') + trend.toFixed(1) + '°C', color: trend >= 0 ? '#D32F2F' : '#2E7D32' },
+    { label: '현재 위험단계', value: level.label, color: level.color }
+  ];
+  var summaryHtml = '';
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    summaryHtml += '<div class="row"><div class="cap">' + row.label + '</div>' +
+      '<div class="val" style="' + (row.color ? 'color:' + row.color : '') + '">' + row.value + '</div></div>';
+  }
+  document.getElementById('ts-summary').innerHTML = summaryHtml;
+
+  var svg = document.getElementById('ts-svg');
+  var W = 560, H = 240, padL = 34, padR = 10, padT = 10, padB = 24;
+  var plotW = W - padL - padR, plotH = H - padT - padB;
+  var yMin = Math.min.apply(null, values) - 2, yMax = Math.max.apply(null, values) + 2;
+  var xStep = plotW / (MOCK_TIME_SERIES.length - 1);
+
+  function xAt(i) { return padL + i * xStep; }
+  function yAt(v) { return padT + plotH - ((v - yMin) / (yMax - yMin)) * plotH; }
+
+  var svgParts = [];
+  var gridCount = 4;
+  for (var g = 0; g <= gridCount; g++) {
+    var y = padT + (plotH / gridCount) * g;
+    svgParts.push('<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#E5E7EB" stroke-width="1"/>');
+  }
+
+  for (var ri = 0; ri < RISK_LEVELS.length - 1; ri++) {
+    var rl = RISK_LEVELS[ri];
+    if (rl.max >= yMin && rl.max <= yMax) {
+      var ly = yAt(rl.max);
+      svgParts.push('<line x1="' + padL + '" y1="' + ly + '" x2="' + (W - padR) + '" y2="' + ly + '" stroke="' + rl.color + '" stroke-width="1" stroke-dasharray="4 4" opacity="0.45"/>');
+    }
+  }
+
+  for (var di = 0; di < MOCK_TIME_SERIES.length; di++) {
+    svgParts.push('<text x="' + xAt(di) + '" y="' + (H - 6) + '" font-size="10" fill="#9CA3AF" text-anchor="middle">' + MOCK_TIME_SERIES[di].time + '</text>');
+  }
+
+  for (var g2 = 0; g2 <= gridCount; g2++) {
+    var val = yMax - ((yMax - yMin) / gridCount) * g2;
+    var y2 = padT + (plotH / gridCount) * g2;
+    svgParts.push('<text x="4" y="' + (y2 + 3) + '" font-size="10" fill="#9CA3AF">' + val.toFixed(0) + '°</text>');
+  }
+
+  var pointsArr = [];
+  for (var pi = 0; pi < MOCK_TIME_SERIES.length; pi++) {
+    pointsArr.push(xAt(pi) + ',' + yAt(MOCK_TIME_SERIES[pi].wbgt));
+  }
+  svgParts.push('<polyline points="' + pointsArr.join(' ') + '" fill="none" stroke="#111827" stroke-width="2"/>');
+
+  for (var ci = 0; ci < MOCK_TIME_SERIES.length; ci++) {
+    svgParts.push('<circle cx="' + xAt(ci) + '" cy="' + yAt(MOCK_TIME_SERIES[ci].wbgt) + '" r="2.5" fill="#111827" style="pointer-events:none"/>');
+  }
+
+  /* tooltip groups — one per data point, hidden until hovered/tapped */
+  for (var ti = 0; ti < MOCK_TIME_SERIES.length; ti++) {
+    var d = MOCK_TIME_SERIES[ti];
+    var px = xAt(ti), py = yAt(d.wbgt);
+    var boxW = 96, boxH = 38;
+    var boxX = Math.min(Math.max(px - boxW / 2, padL - 4), W - padR - boxW + 4);
+    var boxY = Math.max(py - boxH - 12, 2);
+    var lvl = classifyRisk(d.wbgt);
+    svgParts.push(
+      '<g id="ts-tooltip-' + ti + '" style="display:none;pointer-events:none">' +
+        '<rect x="' + boxX + '" y="' + boxY + '" width="' + boxW + '" height="' + boxH + '" rx="4" fill="#111827"/>' +
+        '<text x="' + (boxX + boxW / 2) + '" y="' + (boxY + 15) + '" font-size="10" fill="#D1D5DB" text-anchor="middle">' + d.time + '</text>' +
+        '<text x="' + (boxX + boxW / 2) + '" y="' + (boxY + 29) + '" font-size="12" font-weight="700" fill="#FFFFFF" text-anchor="middle">WBGT ' + d.wbgt + '°C</text>' +
+      '</g>'
+    );
+  }
+
+  /* invisible larger hit-areas for hover(desktop)/tap(mobile) */
+  for (var hi = 0; hi < MOCK_TIME_SERIES.length; hi++) {
+    var hx = xAt(hi), hy = yAt(MOCK_TIME_SERIES[hi].wbgt);
+    svgParts.push('<circle class="ts-hit" data-index="' + hi + '" cx="' + hx + '" cy="' + hy + '" r="12" fill="transparent" style="cursor:pointer"/>');
+  }
+
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  svg.innerHTML = svgParts.join('');
+
+  function hideAllTooltips() {
+    for (var k = 0; k < MOCK_TIME_SERIES.length; k++) {
+      var el = document.getElementById('ts-tooltip-' + k);
+      if (el) el.style.display = 'none';
+    }
+  }
+  function showTooltip(index) {
+    hideAllTooltips();
+    var el = document.getElementById('ts-tooltip-' + index);
+    if (el) el.style.display = '';
+  }
+
+  var hitEls = svg.querySelectorAll('.ts-hit');
+  for (var hj = 0; hj < hitEls.length; hj++) {
+    (function (el) {
+      var idx = el.getAttribute('data-index');
+      el.addEventListener('mouseenter', function () { showTooltip(idx); });
+      el.addEventListener('mouseleave', function () { hideAllTooltips(); });
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var current = document.getElementById('ts-tooltip-' + idx);
+        var isOpen = current && current.style.display !== 'none';
+        hideAllTooltips();
+        if (!isOpen && current) current.style.display = '';
+      });
+    })(hitEls[hj]);
+  }
+  svg.addEventListener('click', function () { hideAllTooltips(); });
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+renderTabNav();
+renderDashboard();
+renderMap();
+renderDetailPanel();
+renderResponseCounts();
+renderPriorityList();
+renderShelters();
+setupLocationPrompt();
+setupEmergencyTransport();
+renderRegionalTable();
+renderTimeSeries();
+</script>
+</body>
+</html>
